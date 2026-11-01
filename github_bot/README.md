@@ -87,10 +87,17 @@ Pull requests:write, Checks:read, Actions:read, Statuses:read. Workflow-file cha
 may additionally require Workflows:write. Branch protections still apply. Actual
 access must be checked; missing CI access or no check runs is not a passing build.
 
-GitHub controls notification delivery. Review re-requests use the documented
-notification endpoint; after HTTP errors, report uncertainty instead of claiming
-success or automatically retrying. On 2026-11-01 a live re-request returned HTTP 500;
-this remains an external failure, not a passing live notification test.
+GitHub controls notification delivery. Review re-requests use the documented GraphQL `rerequestReviews` mutation with
+reviewer node IDs resolved using the installation token. The REST `/rerequest`
+endpoint repeatedly returned HTTP 500 for a pending reviewer; the GraphQL path
+succeeded live on 2026-11-01 with the same App installation and PR. GitHub's internal
+cause of the REST failure is unknown. No permission changes are required.
+
+The helper requires both a successful mutation response for the correct PR and
+confirmed requested-reviewer state. Existing pending state alone is not proof of a
+new notification. It never removes other reviewers or automatically retries or
+falls back after an ambiguous write. GraphQL errors are sanitized. Successful API
+acceptance does not prove email or inbox delivery.
 
 ## Tests
 
@@ -99,7 +106,7 @@ python3 -m unittest discover -s github_bot -v
 ```
 
 Tests use fake API sessions and a disposable local Git repository. They do not use
-real credentials or GitHub writes. The copied helper has 43 tests covering identity,
+real credentials or GitHub writes. The copied helper has 47 tests covering identity,
 credential isolation, ready/stack validation, requests/re-requests, CLI parsing,
 permission reporting, CI reads, and PR editing.
 
@@ -141,3 +148,5 @@ safe rate-limit diagnostics, malformed-header rejection, and existing stack test
 Six additional tests cover config-free argument/environment setup, missing/invalid
 IDs and key paths, rejection of --config, no config-file reads, and credential
 helper compatibility.
+
+[GitHub GraphQL review re-request](https://docs.github.com/en/graphql/reference/pulls#rerequestreviews)

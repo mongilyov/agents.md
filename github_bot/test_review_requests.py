@@ -22,10 +22,6 @@ class ReviewTests(unittest.TestCase):
         bot.request_review(s,1,['Reviewer'])
         self.assertEqual(len(s.writes),1)
         self.assertEqual(s.writes[0][1],'/pulls/1/requested_reviewers')
-    def test_rerequest_uses_notification_endpoint_once(self):
-        s=ReviewSession(); s.prs[1]['requested_reviewers']=[{'login':'reviewer'}]
-        bot.request_review(s,1,['reviewer'],rerequest=True)
-        self.assertEqual(s.writes,[('POST','/pulls/1/requested_reviewers/rerequest',{'reviewers':['reviewer']})])
     def test_refuse_draft_closed_author_missing_permissions(self):
         for case in ['draft','closed','author','permissions']:
             s=ReviewSession()
@@ -51,7 +47,7 @@ class ReviewTests(unittest.TestCase):
             if method=='POST': raise bot.BotError('lost response')
             return result
         s.request=request
-        with self.assertRaises(bot.BotError): bot.request_review(s,1,['reviewer'],rerequest=True)
+        with self.assertRaises(bot.BotError): bot.request_review(s,1,['reviewer'])
         self.assertEqual(len(s.writes),1)
     def test_cli(self):
         a=bot.parser().parse_args(['request-review','--pr','1','--reviewers','reviewer','--rerequest'])

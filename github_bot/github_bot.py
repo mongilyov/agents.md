@@ -327,9 +327,29 @@ def request_review(session, number, reviewers, rerequest=False):
     pending = {r['login'].lower() for r in pr.get('requested_reviewers', [])}
     requested = reviewers if rerequest else [r for r in reviewers if r not in pending]
     if requested:
-        suffix = f'/pulls/{number}/requested_reviewers' + ('/rerequest' if rerequest else '')
-        # A re-request sends notifications. Never retry an ambiguous write automatically.
-        session.request('POST', suffix, {'reviewers': requested})
+        # Never retry or switch transports after an ambiguous notification write.
+        if rerequest:
+            users = []
+            for login in requested:
+                user = api('GET', '/users/' + urllib.parse.quote(login, safe=''), session.token)
+                if (user.get('login', '').lower() != login or user.get('type') != 'User'
+                        or not user.get('node_id')):
+                    raise BotError('GitHub did not confirm the reviewer identity.')
+                users.append(user['node_id'])
+            query = '''mutation($id: ID!, $users: [ID!]!) {
+              rerequestReviews(input: {pullRequestId: $id, userIds: $users}) {
+                pullRequest { id }
+              }
+            }'''
+            result = api('POST', '/graphql', session.token,
+                         {'query': query, 'variables': {'id': pr['node_id'], 'users': users}})
+            payload = ((result.get('data') or {}).get('rerequestReviews') or {}).get('pullRequest') or {}
+            if result.get('errors') or payload.get('id') != pr['node_id']:
+                # Pending reviewers alone cannot prove a fresh notification succeeded.
+                # Do not echo untrusted GraphQL messages or retry the mutation.
+                raise BotError('GitHub did not confirm the review re-request; inspect the PR before retrying.')
+        else:
+            session.request('POST', f'/pulls/{number}/requested_reviewers', {'reviewers': requested})
     current = get_open_pr(session, number)
     pending = {r['login'].lower() for r in current.get('requested_reviewers', [])}
     if not set(reviewers).issubset(pending):
