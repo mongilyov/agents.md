@@ -16,7 +16,7 @@ merging remains under human control.
 1. Copy `templates/AGENTS.md` to the project's root. If an AGENTS.md already exists,
    merge the relevant rules carefully instead of overwriting it.
 2. Fill in its Project-specific settings using the real repository, integration
-   branch, commands, architecture references, and bot helper paths. Checkout paths
+   branch, reviewers, commands, architecture references, and bot helper paths. Checkout paths
    are resolved at runtime, so worktrees use their own paths. Keep credentials out.
 3. Keep the project's existing PROJECT_SPEC.md. For a new project, copy its template
    and write the specification together before implementation.
@@ -29,7 +29,8 @@ merging remains under human control.
 Example task:
 
 > Implement Increment 01: Connection setup from the agreed WORK_PLAN.md.
-> Create its small stacked draft PRs using the configured bot helper.
+> Create its small stacked PRs ready for review using the configured bot helper.
+> Request review from mongilyov on every PR.
 > Complete and verify the whole increment, then stop for review. Do not merge.
 
 ## PR description

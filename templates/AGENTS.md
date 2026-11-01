@@ -6,6 +6,7 @@ Fill these in when adopting this template. Replace placeholders with verified
 values; use `not applicable` where appropriate. Never store credentials here.
 
 - Repository: `<OWNER/REPO>`
+- Reviewers: `<GitHub usernames to request on every PR>`
 - Integration branch: `<main or other branch>`
 - Setup command: `<command>`
 - Build command: `<command or not applicable>`
@@ -82,7 +83,7 @@ For every new behavior or bug fix, use the project's test framework and repeat t
 - Before substantial work, outline the PR sequence, dependencies, and verification for each step. Keep a genuinely small task to one PR.
 - Stack dependent branches: `<integration> <- codex/step-1 <- codex/step-2`. The first PR targets the project's integration branch; each later PR targets the preceding branch, so its diff shows only its own increment. Independent changes target the integration branch directly.
 - Complete the TDD cycle within each PR. Keep the behavior change and its tests together; do not publish a failing-test-only PR followed by a separate fix. Each step must build and pass relevant tests on top of its dependencies.
-- Open each small PR when publishing is authorized, then continue the selected increment's stack. Use a draft for unfinished or unverified work, and state what remains.
+- Open each verified small PR ready for review when publishing is authorized, and request review from the reviewers configured in Project-specific settings. Continue the selected increment's stack without waiting for review. Use drafts only when explicitly requested by the user; if verification is blocked, report it instead of silently delivering a draft. Confirm both the ready state and requested reviewers on GitHub.
 - In every PR description, include the increment number and name, the checkbox(s) it advances or completes, a short explanation of what changed and why, dependency links, and verification results. Make the stack order obvious. Keep this text concise.
 - Apply review fixes to the branch that owns the change, then update dependent branches and rerun affected checks. Keep PR bases and dependency links correct as earlier PRs merge, without duplicating their changes in later diffs.
 - Evaluate automated review suggestions against actual requirements and evidence. Fix real issues; avoid speculative changes that only increase complexity.
@@ -116,12 +117,18 @@ Commands:
 - check: verify authentication and repository access.
 - commit --message-file PATH: commit already-staged changes as the bot.
 - push --branch BRANCH: push the named branch.
-- create-pr --head BRANCH --title TITLE --body-file PATH:
-  create a draft PR; add --base PARENT_BRANCH for stacked PRs.
+- create-pr --ready --head BRANCH --title TITLE --body-file PATH:
+  create a PR ready for review; add --base PARENT_BRANCH for stacked PRs.
+- ready --pr NUMBER: mark an existing draft ready for review.
 - comments --pr NUMBER: read PR comments and reviews.
 - reply --pr NUMBER --body-file PATH: post a conversation comment.
 - reply --pr NUMBER --review-comment-id ID --body-file PATH:
   reply in an inline review thread.
+
+Creating a ready PR does not request reviewers automatically. Request the configured
+reviewers separately using bot-authenticated GitHub access. If the helper lacks a
+review-request command, use its authenticated API session or report the blocker;
+do not invent a command or claim review was requested without verification.
 
 Use this helper instead of personal GitHub credentials.
 Never print private keys or tokens.
