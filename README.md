@@ -1,183 +1,138 @@
 # Agent workflow
 
-A pinned submodule containing reusable instructions, templates, a validator, and
-the GitHub bot helper. Complete one user-selected increment as small, ready,
-stacked PRs, then stop for review. Each checkbox may span several PRs.
-
-## Layout
+Shared engineering rules and a GitHub bot helper, pinned together as a submodule.
+Each project keeps a short root AGENTS.md with its own settings and an explicit
+instruction to read `.agent-workflow/AGENTS.md`. Shared rules are not copied.
 
 ```text
-templates/AGENTS.md          Shared rules and project settings
-templates/PROJECT_SPEC.md    Product requirements
-templates/WORK_PLAN.md       Agreed increments and verification
-scripts/check_agents.py     Guard against unintended instruction changes
-github_bot/github_bot.py     Bot-only GitHub CLI
-github_bot/README.md         Helper setup, commands, and limitations
+AGENTS.md                   Shared rules: TDD, increments, small stacked PRs
+templates/AGENTS.md         Project settings and link to the shared rules
+templates/PROJECT_SPEC.md   Product requirements template
+templates/WORK_PLAN.md      Increment and verification template
+github_bot/                 Bot-only CLI, documentation, and tests
 ```
 
-## Adopt as a submodule
+## New project
 
-Use `.agent-workflow` as the submodule path. The project keeps its own configured
-root AGENTS.md; all helper code, reference templates, and validation come from the
-pinned submodule commit. Do not edit settings inside the submodule.
+1. Create the repository and its initial `master` commit. Give the bot installation
+   access to both the project and this workflow repository.
+2. On a setup branch, add `.agent-workflow` at an approved, reviewed commit. The
+   initial submodule installation is human setup because the bundled helper is not
+   yet available. From the project root:
 
-1. **Bootstrap commit.** Choose a reviewed upstream commit containing the templates
-   and helper. Add this repository as `.agent-workflow`, check out that commit, and
-   copy its AGENTS.md template to the parent root without overwriting existing work.
-   Commit `.gitmodules`, the submodule pointer, and the untouched root AGENTS.md.
-   The agent needs explicit authorization for this bootstrap-only setup-gate bypass;
-   `Setup confirmed` remains `no`.
-2. **Settings commit.** The agent asks you to fill and approve the marked settings.
-   Set the parent repository, reviewers, commands, agent prefix, source revision,
-   and the nonsecret GitHub App and installation IDs. The integration branch is `master`. Paths to the
-   helper, README, template, and validator already point into `.agent-workflow`.
-   After your explicit confirmation, record `Setup confirmed: yes`, validate, and
-   commit only the settings changes.
-3. **Specification and plan.** Keep existing documents. Otherwise copy the spec
-   template and write it together, then create/refine WORK_PLAN.md together. Publish
-   the agreed plan as a small documentation PR when authorized.
-4. **Implementation.** You select an increment and authorize its PR stack. The agent
-   completes all its checkboxes as small PRs, without waiting between them for
-   review or merge, then stops after verifying the selected increment.
+   ```sh
+   git submodule add https://github.com/mongilyov/agents.md.git .agent-workflow
+   git -C .agent-workflow checkout --detach APPROVED_SHA
+   cp .agent-workflow/templates/AGENTS.md AGENTS.md
+   ```
 
-The commits above belong on setup branches and can be small dependent PRs. Do not
-push directly to master. If existing AGENTS.md has custom rules, discuss and review
-how to reconcile them before replacing anything.
+   Copy only if no root AGENTS.md exists. Commit the submodule pointer, .gitmodules,
+   and settings template as the bootstrap commit. An agent preparing this commit
+   needs an explicit setup-gate bypass limited to bootstrap.
+3. Fill the root AGENTS.md together with the user. Obtain explicit approval before
+   setting `Setup confirmed: yes`; commit approved settings separately. Supply the
+   App and installation IDs, repository, reviewers, commands, and conventions.
+   Keep the key outside the repository and pass its path through
+   `GITHUB_APP_PRIVATE_KEY_PATH`. No config.json is needed.
+4. Write PROJECT_SPEC.md and WORK_PLAN.md together, using the templates if needed.
+   Select one increment and authorize its stack of small, ready PRs. The agent
+   completes that increment across its checkboxes, then stops for review.
 
-### Initial human setup
+Publish setup changes as small PRs; never push directly to master. The Markdown
+link is not automatic inclusion: the project template explicitly tells agents to
+open and follow the shared file. If it is missing, initialization comes first.
 
-The helper cannot initialize or clone its own missing submodule. A human can use
-these standard Git operations once, from the parent checkout after inspecting its
-working tree (replace APPROVED_SHA with the reviewed commit):
+## Existing project
+
+Adopt the workflow in a dedicated migration PR from the integration branch.
+Compare the old AGENTS.md with the shared rules and agree how to preserve useful
+project conventions in root settings or linked project documents. Replace copied
+shared text with the explicit link only after agreeing the migration. Keep existing
+specifications and work plans. Do not overwrite unrelated work or automatically
+rebase, retarget, or restack existing PRs.
+
+After the migration merges, synchronize active branches when authorized so they
+receive the new root instructions and submodule pin. A branch still containing the
+old instructions has not adopted the new workflow yet.
+
+For projects using the previous copied-template layout, remove obsolete source
+revision/template/validator fields and any CI job invoking `check_agents.py` in
+the migration PR. The comparison script and its tests have been removed; preserve
+unrelated CI. The submodule pointer is the single record of the workflow version.
+
+## Pull with submodules
+
+Whenever pulling a project, use:
 
 ```sh
-git submodule add https://github.com/mongilyov/agents.md.git .agent-workflow
-git -C .agent-workflow checkout --detach APPROVED_SHA
-cp .agent-workflow/templates/AGENTS.md AGENTS.md
+git pull --ff-only --recurse-submodules
 ```
 
-Run the copy only when root AGENTS.md does not already exist. New clones also need
-human `git submodule update --init --recursive` before the bundled helper is
-available. Agents must report unsupported bootstrap operations rather than bypass
-bot-only GitHub access. After initialization, use the helper for bot commits,
-pushes, fetches, and all GitHub API operations.
+Inspect the working tree first. Stop on local changes or divergence that prevent
+safe synchronization; do not force or discard work. For a new clone, a human must
+initialize missing submodules with `git submodule update --init --recursive`.
+Recursive pull synchronizes recorded submodule commits; it does not adopt the
+latest workflow master. Do not use `submodule update --remote` for routine sync.
 
-Keep the private key outside both repositories. The bundled helper uses no config
-file: the agent passes public settings from AGENTS.md as CLI arguments and the
-key's local path through `GITHUB_APP_PRIVATE_KEY_PATH`. If that environment variable
-is missing, it asks you for the path in chat, not the key contents.
+Agents still use only the helper for GitHub access. It currently supports `fetch`,
+not `pull`. The equivalent is helper-authenticated fetches for the parent and
+initialized submodules, an authorized local fast-forward to the intended fetched
+branch, then `git submodule update --init --recursive --no-fetch --checkout`.
+Missing initialization or objects requiring unsupported network operations must be
+reported for human setup. Do not invent a helper command or use personal credentials.
+
+## Upgrade with a dedicated PR
+
+When authorized to bump the workflow:
+
+1. Review upstream changes and choose a reviewed commit. Fetch through the current
+   trusted helper, selecting the workflow repository and submodule checkout.
+2. Check out the chosen commit detached in the clean `.agent-workflow` submodule.
+3. Read the updated shared rules and verify helper changes before using credentials.
+   Discuss any new required settings with the user.
+4. Commit the submodule pointer in a dedicated project PR. Include old/new commits,
+   what changed, why, and checks performed. Usually root AGENTS.md needs no edit.
+   If settings or its link need changing, include those in this PR.
+
+If a feature depends on the bump, it can be the bottom PR of that feature's stack.
+Otherwise keep it independent. Shared edits require a separate upstream PR first;
+never implement them inside a project's submodule. Existing projects stay pinned
+until their own upgrade PR is accepted.
+
+## Bot and reviews
+
+Read [the helper guide](github_bot/README.md) before first use. Agents pass approved
+root settings explicitly and supply only the key path through the environment:
 
 ```text
 python3 .agent-workflow/github_bot/github_bot.py \
   --app-id APP_ID --installation-id INSTALLATION_ID \
-  --repo OWNER/REPO --checkout /absolute/path/to/parent-project <command>
+  --repo OWNER/REPO --checkout /absolute/path/to/project <command>
 ```
 
-Set the environment variable in your shell or authorize the agent to set it for
-its helper process. No config.json, key path, or private key belongs in the project.
-The checkout argument is the parent project (or its worktree), not the helper's
-submodule directory. The App and installation IDs must be supplied during setup;
-they cannot be derived from the key or origin alone. See github_bot/README.md.
+Use `create-pr --ready`, then `request-review`. After each verified feedback batch,
+re-request review once with `request-review --rerequest`. Dependent PRs target their
+predecessors; register the complete bottom-to-top sequence with `stack --prs ...`.
+The helper currently refuses changes to an existing stack's membership; report
+that limitation rather than bypassing it. Never merge automatically.
 
-Existing ~/tools/github_bot installations remain unchanged and retain their old
-config interface. Only the bundled helper removes --config. Update the instructions
-and submodule pin together when adopting this interface.
-
-## Synchronizing versus upgrading
-
-**Synchronizing** means getting the version already recorded by the parent project.
-A human's `git pull --ff-only --recurse-submodules` can fast-forward the parent and
-update populated submodules to its recorded commits. It does not adopt the newest
-workflow master simply because that upstream branch moved. It may fail on dirty
-or diverged work; never use force/reset to hide that situation.
-
-For agents, keep synchronization explicit and use helper-authenticated fetches.
-Do not automatically pull, merge, or run `submodule update --remote` at startup.
-After an authorized parent fast-forward, an initialized clean submodule can be
-synchronized locally with:
-
-```sh
-git submodule update --no-fetch --checkout -- .agent-workflow
-```
-
-If the recorded commit is missing locally, fetch through the helper selecting
-`--repo mongilyov/agents.md --checkout /absolute/path/to/.agent-workflow` first.
-The app must have access to both repositories. Initial cloning remains human setup.
-
-**Upgrading** means deliberately selecting a newer reviewed workflow commit:
-
-1. Obtain user authorization and review the upstream diff, including helper code
-   that will run with credentials. Fetch through the current trusted helper.
-2. In a clean submodule, check out the approved commit in detached mode.
-3. Refresh the root AGENTS.md shared text, preserving project settings. Update its
-   recorded source revision; discuss and fill any new settings explicitly.
-4. Run the bundled tests and validator. Commit the new submodule pointer and root
-   AGENTS.md together in a dedicated parent-project PR.
-5. If an authorized feature depends on this upgrade, place the upgrade PR at the
-   bottom of its stack; base the feature's first PR on that branch. Otherwise keep
-   the upgrade independent. Do not bundle the upgrade into a feature diff.
-
-The parent commit records the submodule SHA, not edits inside it. Shared helper or
-rule changes require their own upstream commit/PR first. After upstream review and
-merge, a parent project may adopt that commit. No feature branches or settings
-edits inside the project's submodule; use a separate upstream checkout for that work.
-
-## Validate and protect instructions
-
-After approved setup and before publishing:
-
-```sh
-python3 .agent-workflow/scripts/check_agents.py \
-  --template .agent-workflow/templates/AGENTS.md --agents AGENTS.md
-```
-
-During bootstrap only, add `--allow-unconfigured` to check unchanged shared text.
-The validator rejects edits outside settings, removed/added fields, placeholders,
-and missing confirmation. It cannot prove that a human approved the settings.
-
-Use required CI and human code-owner review for AGENTS.md, `.gitmodules`, the
-submodule pointer, and the CI check itself. Protect the upstream repository too.
-Instructions and submodules are not access controls, and cannot provide a 100%
-guarantee against an agent with write access. These protections must be configured
-in each project; this repository does not silently configure them for you.
-
-## Stacked PRs and review
-
-Dependent PRs target their predecessor's branch. Once the complete intended set
-exists, register it with `stack --prs ...` in bottom-to-top order and verify native
-GitHub stack membership. Independent PRs stay independent. The current helper
-refuses changing an existing stack's membership; report that limitation rather
-than pretending an extension succeeded or bypassing the helper.
-
-Create PRs with `--ready`, request configured reviewers separately, and re-request
-review once after each verified feedback batch. Notification delivery is controlled
-by GitHub; never claim delivery after an error or blindly retry ambiguous writes.
-
-```text
-Increment: 01 — Connection setup
-Checkboxes: advances 01.1 / completes 01.2
-What: <specific change>
-Why: <reason>
-Stack: <parent PR or master; related PRs>
-Validation: <actual checks and results; pending checks>
-```
+Every PR briefly states its increment number/name, what changed and why,
+checkboxes advanced/completed, dependencies, and validation results.
 
 ## Maintain this repository
 
-The template is not active instructions for maintaining this repository itself.
-Keep its setup placeholders. Run:
+Root AGENTS.md contains the shared workflow. Its downstream setup gate does not
+apply to maintenance of this source repository. Keep project-template settings
+unfilled. For helper changes, run:
 
 ```sh
-python3 -m unittest discover -s tests -v
 python3 -m unittest discover -s github_bot -v
-python3 scripts/check_agents.py --template templates/AGENTS.md \
-  --agents templates/AGENTS.md --allow-unconfigured
 ```
 
-Never commit a real config.json, private key, token, or __pycache__. Git history and
-PRs replace a changelog. Previously installed local helper copies do not update
-automatically; adopted projects should use the bundled version through their pin.
+For documentation changes, review links and adoption/migration instructions.
+There is no copy-validation script or duplicated workflow revision to maintain.
+Never commit private keys, tokens, config.json, or __pycache__. Existing external
+helpers and other projects are not modified by updates here.
 
 [Git submodules](https://git-scm.com/docs/git-submodule) ·
-[Git pull](https://git-scm.com/docs/git-pull) ·
-[GitHub review requests](https://docs.github.com/en/rest/pulls/review-requests)
+[Git pull](https://git-scm.com/docs/git-pull)
