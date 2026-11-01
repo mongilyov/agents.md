@@ -26,11 +26,13 @@ values; use `not applicable` where appropriate. Never store credentials here.
 - Other required checks: `<lint, typecheck, integration checks, etc.>`
 - UI verification: `<launch command and affected-flow verification, or not applicable>`
 - Architecture and conventions: `<key constraints and links to repository docs>`
-- GitHub bot helper: `<absolute path to github_bot.py on this machine>`
-- GitHub bot README: `<absolute path to the helper's README.md>`
+- Workflow submodule: `.agent-workflow`
+- GitHub bot helper: `.agent-workflow/github_bot/github_bot.py`
+- GitHub bot README: `.agent-workflow/github_bot/README.md`
+- GitHub bot config: `<absolute path to external config.json; never commit it or the private key>`
 - Workflow source revision: `<approved commit SHA from mongilyov/agents.md>`
-- Pinned workflow template: `<path to the unmodified template copy or submodule template>`
-- Workflow validator: `<path to check_agents.py>`
+- Pinned workflow template: `.agent-workflow/templates/AGENTS.md`
+- Workflow validator: `.agent-workflow/scripts/check_agents.py`
 <!-- END PROJECT SETTINGS -->
 
 Resolve the checkout path from the actual working checkout, including when using
@@ -41,10 +43,13 @@ invalid settings require returning to the setup gate.
 ## Protect and update these instructions
 
 - During setup, change only the content between the project settings markers. Preserve all shared text and the markers exactly. During ordinary feature work, do not change AGENTS.md, its pinned template, validator, or workflow source revision.
-- Adopt a committed copy from an explicitly selected upstream commit. Keep the unmodified template and validator under `.agent-workflow/` in the project, and record the source commit in settings. Never fetch and apply the latest rules automatically at task startup.
+- Adopt this repository as a submodule at `.agent-workflow`, pinned to an explicitly approved commit. Copy its template to the parent project's root AGENTS.md; use the bundled helper and validator at the configured paths. Keep credentials and real helper configuration outside both repositories. Never fetch and apply the latest workflow automatically at task startup.
 - Run the configured validator against the configured pinned template and AGENTS.md after setup and before publishing changes. `--allow-unconfigured` is for setup-only shared-text checks, not a bypass for ordinary work. Report failures; do not alter the baseline or checker to make them pass.
-- Update shared rules only when the user explicitly requests a workflow update. Prepare a separate PR showing the upstream changes, new pinned template/validator/revision, and updated AGENTS.md while preserving project settings. Ordinary feature authorization does not authorize instruction changes.
-- If the project uses a submodule for the upstream source, treat it as read-only and pinned. Keep the configured AGENTS.md in the parent project. Do not fill settings or create feature branches inside the submodule. An approved update requires committing the new submodule pointer and refreshed parent AGENTS.md together in the parent project's workflow-update PR. Shared changes belong in a separate upstream PR first.
+- Update shared rules or the bundled helper only when the user explicitly requests a workflow update. Review the upstream diff, select the approved commit, update the submodule pointer and recorded revision, and refresh root AGENTS.md while preserving settings. Verify the new helper and validator before using them with credentials. Commit these changes together in a dedicated parent-project PR. Ordinary feature authorization does not authorize a workflow upgrade.
+- Treat the submodule as read-only during project work. Do not fill settings or create feature branches inside it. Shared changes require a separate upstream PR; after merge, adopt the reviewed commit in the parent project. The parent's commit stores the submodule commit ID, not uncommitted edits inside it.
+- Distinguish synchronization from upgrade. Synchronization checks out the submodule commit already recorded by the parent; it does not advance to upstream master. An upgrade intentionally changes the recorded commit and requires the dedicated PR above. That PR may be the bottom of an authorized feature stack when the feature needs it; subsequent feature PRs target its branch. Otherwise keep the upgrade separate.
+- Do not run automatic `git pull --recurse-submodules` or `git submodule update --remote` at task startup. After authorized parent synchronization, use helper-authenticated fetches for any needed objects, then local `git submodule update --no-fetch --checkout -- .agent-workflow` to restore the recorded version in an initialized, clean submodule. Stop if local changes or missing initialization prevent this; do not force, reset, or bypass helper authentication.
+- Bootstrap sequence: explicitly authorized submodule installation plus an untouched root template copy is the first setup commit; explicitly approved settings are the second; the specification and jointly agreed plan follow. The unconfigured bootstrap commit requires a user-approved setup-gate exception limited to that operation. A first install or clone that needs unsupported helper operations is human setup, not permission to improvise alternate GitHub commands.
 - These instructions and the validator catch mistakes; they are not access controls. Protect the workflow files and validator with human code-owner review and required CI where available. Do not change those protections as part of feature work.
 
 ## Understand first
@@ -104,6 +109,7 @@ For every new behavior or bug fix, use the project's test framework and repeat t
 - Deliver code changes through small PRs. Each PR must have one clear purpose and contain only the smallest coherent change needed to achieve it. Split changes that can be reviewed separately; do not bundle an entire feature into one large PR.
 - Before substantial work, outline the PR sequence, dependencies, and verification for each step. Keep a genuinely small task to one PR.
 - Stack dependent branches: `master <- <agent_name>/step-1 <- <agent_name>/step-2`. The first PR targets the project's integration branch; each later PR targets the preceding branch, so its diff shows only its own increment. Independent changes target the integration branch directly.
+- For two or more dependent PRs, also register their complete intended bottom-to-top order with `stack --prs ...` after creating them, and verify the reported membership. Dependent base branches and native stack registration are both required; do not stack independent PRs. If registration or extending an existing stack is unsupported or fails, retain correct bases and report the blocker instead of claiming a registered stack or bypassing the helper.
 - Complete the TDD cycle within each PR. Keep the behavior change and its tests together; do not publish a failing-test-only PR followed by a separate fix. Each step must build and pass relevant tests on top of its dependencies.
 - Open each verified small PR ready for review when publishing is authorized, and request review from the reviewers configured in Project-specific settings. Continue the selected increment's stack without waiting for review. Use drafts only when explicitly requested by the user; if verification is blocked, report it instead of silently delivering a draft. Confirm both the ready state and requested reviewers on GitHub.
 - In every PR description, include the increment number and name, the checkbox(s) it advances or completes, a short explanation of what changed and why, dependency links, and verification results. Make the stack order obvious. Keep this text concise.
@@ -129,11 +135,13 @@ and review requests. Do not use gh, curl, browser writes, alternate API scripts,
 imports of helper internals, or personal credentials. Local Git status/diff/add/branch
 operations may use Git directly. Read its configured README.md before first use.
 
-Invoke it with python3. Always pass the configured repository and the actual
-absolute checkout path before the subcommand:
+Resolve configured relative paths from the parent project root. Invoke with python3
+and explicitly pass the external config, repository, and actual parent checkout
+path (including worktrees) before the subcommand. For an authorized source fetch,
+select the workflow repository and submodule checkout instead:
 
 ```text
-python3 <helper-path> --repo <OWNER/REPO> --checkout <ABSOLUTE_PATH> <subcommand>
+python3 <helper-path> --config <EXTERNAL_CONFIG_PATH> --repo <OWNER/REPO> --checkout <PARENT_CHECKOUT_PATH> <subcommand>
 ```
 
 If the helper is unavailable or unconfigured, report the publishing blocker;
@@ -148,6 +156,7 @@ Commands:
 - push --branch BRANCH: push the named branch.
 - create-pr --ready --head BRANCH --title TITLE --body-file PATH:
   create a PR ready for review; add --base PARENT_BRANCH for stacked PRs.
+- edit-pr --pr NUMBER [--title TITLE] [--body-file PATH]: update PR metadata.
 - ready --pr NUMBER: mark an existing draft ready for review.
 - request-review --pr NUMBER --reviewers LOGIN [LOGIN ...]: request and verify review.
 - request-review --pr NUMBER --reviewers LOGIN [LOGIN ...] --rerequest:
