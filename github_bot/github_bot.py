@@ -24,6 +24,37 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None  # Never forward authentication to a redirect destination.
 
 
+def http_error_diagnostic(method, path, error, authenticated):
+    # Only bounded numeric rate-limit headers are safe to echo. Never read the
+    # response body, Authorization, arbitrary headers, or server reason text.
+    fields = {}
+    for header, label in [('X-RateLimit-Limit', 'limit'),
+                          ('X-RateLimit-Remaining', 'remaining'),
+                          ('X-RateLimit-Reset', 'reset_epoch'),
+                          ('Retry-After', 'retry_after_seconds')]:
+        value = (error.headers or {}).get(header, '')
+        if re.fullmatch(r'[0-9]{1,20}', value):
+            fields[label] = value
+    auth = 'authenticated' if authenticated else 'unauthenticated'
+    message = f'GitHub {method} {path}: HTTP {error.code} ({auth} request).'
+    if fields:
+        message += ' Rate-limit headers: ' + ', '.join(f'{k}={v}' for k, v in fields.items()) + '.'
+    if error.code in (403, 429):
+        if fields.get('remaining') == '0':
+            message += ' GitHub primary rate limit exhausted; wait until reset before retrying.'
+        elif error.code == 429 or 'retry_after_seconds' in fields:
+            message += ' GitHub indicates throttling/rate limiting; honor Retry-After before retrying.'
+        else:
+            message += ' The cause is not established: rate limiting or an access policy may apply to this request.'
+    elif error.code == 401:
+        message += ' Authentication was rejected for this request.'
+    elif error.code >= 500:
+        message += ' GitHub server error; a write may have succeeded. Do not blindly retry.'
+    else:
+        message += ' Inspect this endpoint and its request requirements.'
+    return message
+
+
 def api(method, path, token, data=None):
     if not path.startswith('/') or path.startswith('//'):
         raise BotError('Invalid API path')
@@ -41,9 +72,7 @@ def api(method, path, token, data=None):
             raw = response.read()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as error:
-        # Do not print request headers, tokens, or raw server responses.
-        raise BotError(f'GitHub {method} {path}: HTTP {error.code}. '
-                       'Check installation access and app permissions.') from None
+        raise BotError(http_error_diagnostic(method, path, error, bool(token))) from None
     except urllib.error.URLError:
         raise BotError('Cannot connect to GitHub (network or TLS error).') from None
 
@@ -93,23 +122,26 @@ class Session:
         grant = api('POST', f"/app/installations/{self.config['installation_id']}/access_tokens",
                     app_jwt, {'repositories': [self.repo.split('/')[1]]})
         self.token = grant['token']
-        self.permissions = grant.get('permissions', {})
-        self.expires = grant['expires_at']
         try:
+            self.permissions = grant.get('permissions', {})
+            self.expires = grant['expires_at']
             bot = api('GET', '/users/' + urllib.parse.quote(app['slug'] + '[bot]'), self.token)
             self.login = bot['login']
             self.email = f"{bot['id']}+{self.login}@users.noreply.github.com"
-        except (BotError, KeyError):
+        except BaseException:
             self.__exit__()  # Context-manager exit is not invoked when enter fails.
             raise
         return self
 
     def __exit__(self, *args):
+        if self.token is None:
+            return
         try:
             api('DELETE', '/installation/token', self.token)
-        except BotError:
+        except (BotError, OSError, ValueError, KeyError):
             print('Note: token revocation failed; the token will expire automatically.', file=sys.stderr)
-        self.token = None
+        finally:
+            self.token = None
 
     def request(self, method, suffix, data=None):
         return api(method, '/repos/' + self.repo + suffix, self.token, data)

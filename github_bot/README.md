@@ -83,7 +83,7 @@ python3 -m unittest discover -s github_bot -v
 ```
 
 Tests use fake API sessions and a disposable local Git repository. They do not use
-real credentials or GitHub writes. The copied helper has 29 tests covering identity,
+real credentials or GitHub writes. The copied helper has 37 tests covering identity,
 credential isolation, ready/stack validation, requests/re-requests, CLI parsing,
 permission reporting, CI reads, and PR editing.
 
@@ -93,3 +93,31 @@ The bundled copy also authenticates its bot-identity lookup with the scoped
 installation token, avoiding the unauthenticated lookup that returned HTTP 403.
 It revokes the token if that lookup fails. Tests cover the authenticated call and
 cleanup on failure; success against GitHub must still be verified separately.
+
+## Diagnosing authentication and rate limits
+
+The private key signs an app JWT. The JWT authenticates the app while it requests
+an installation token scoped to the selected repository. Repository requests and
+the bot-user lookup use that installation token; the private key is never sent to
+GitHub. Merely having a key does not authenticate a request without its header.
+
+The user lookup runs after token creation and uses that token. Any failure after
+token creation attempts revocation; local token state is cleared even when
+revocation fails, and cleanup errors do not replace the original failure.
+
+HTTP diagnostics show the method, endpoint, status, whether authentication was
+sent, and bounded numeric rate-limit headers (limit, remaining, reset_epoch, and
+retry_after_seconds). They never print the response body, Authorization header,
+JWT, token, private key, or arbitrary response headers. A 403/429 with remaining=0
+identifies primary rate exhaustion. Retry-After/429 reports throttling. A 403 with
+no supporting headers remains ambiguous; it does not establish missing permissions.
+Honor backoff headers and do not automatically retry mutations.
+
+A failure at GET /users/<bot> is session initialization failure, before any
+/stacks endpoint. Do not change stack permissions on that evidence. Check which
+helper path the agent actually executed; older local or pinned copies can retain
+the unauthenticated lookup. This repository's helper and the maintained external
+local copy now use authenticated lookup. Other submodule pins need explicit updates.
+
+37 offline tests pass, including lookup order/token use, token cleanup on failure,
+safe rate-limit diagnostics, malformed-header rejection, and existing stack tests.
