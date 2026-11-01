@@ -324,14 +324,16 @@ def request_review(session, number, reviewers, rerequest=False):
     reviewers = list(dict.fromkeys(r.lower() for r in reviewers))
     if (pr.get('user') or {}).get('login', '').lower() in reviewers:
         raise BotError('A PR author cannot review their own PR.')
-    pending = {r['login'].lower() for r in pr.get('requested_reviewers', [])}
+    pending = {r['login'].lower(): r for r in pr.get('requested_reviewers', [])}
     requested = reviewers if rerequest else [r for r in reviewers if r not in pending]
     if requested:
         # Never retry or switch transports after an ambiguous notification write.
         if rerequest:
             users = []
             for login in requested:
-                user = api('GET', '/users/' + urllib.parse.quote(login, safe=''), session.token)
+                user = pending.get(login, {})
+                if not user.get('node_id') or user.get('type') != 'User':
+                    user = api('GET', '/users/' + urllib.parse.quote(login, safe=''), session.token)
                 if (user.get('login', '').lower() != login or user.get('type') != 'User'
                         or not user.get('node_id')):
                     raise BotError('GitHub did not confirm the reviewer identity.')
@@ -350,7 +352,7 @@ def request_review(session, number, reviewers, rerequest=False):
                 raise BotError('GitHub did not confirm the review re-request; inspect the PR before retrying.')
         else:
             session.request('POST', f'/pulls/{number}/requested_reviewers', {'reviewers': requested})
-    current = get_open_pr(session, number)
+    current = get_open_pr(session, number) if requested else pr
     pending = {r['login'].lower() for r in current.get('requested_reviewers', [])}
     if not set(reviewers).issubset(pending):
         raise BotError('Review request was not confirmed; inspect the PR before retrying.')

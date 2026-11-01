@@ -106,7 +106,7 @@ python3 -m unittest discover -s github_bot -v
 ```
 
 Tests use fake API sessions and a disposable local Git repository. They do not use
-real credentials or GitHub writes. The copied helper has 47 tests covering identity,
+real credentials or GitHub writes. The copied helper has 49 tests covering identity,
 credential isolation, ready/stack validation, requests/re-requests, CLI parsing,
 permission reporting, CI reads, and PR editing.
 
@@ -150,3 +150,7 @@ IDs and key paths, rejection of --config, no config-file reads, and credential
 helper compatibility.
 
 [GitHub GraphQL review re-request](https://docs.github.com/en/graphql/reference/pulls#rerequestreviews)
+
+Review commands reuse reviewer identities from the current PR response when
+available. An already-pending ordinary request needs only the initial PR read;
+actual writes still receive a fresh verification read. No persistent cache is used.
