@@ -12,16 +12,18 @@ project's AGENTS.md. The agent reads those settings and passes CLI arguments; th
 helper intentionally does not parse arbitrary Markdown. Confirm the repository
 against origin and resolve the actual checkout path, including worktrees.
 
-The private key remains a local file outside repositories. Only its path is passed
-through `GITHUB_APP_PRIVATE_KEY_PATH`. If it is missing, the agent asks for the local
-path, never the key contents. It may set a process environment variable with user
-authorization; it must not persist the path in AGENTS.md, config files, or shell
-startup files. If the variable is already valid, no repeated question is needed.
+The private key remains a local file outside repositories. The user supplies its
+absolute path in chat; the agent sets `GITHUB_APP_PRIVATE_KEY_PATH` on each helper
+process. The user does not need to export anything. Reuse a valid existing variable
+or a path already supplied in the conversation; ask only when neither is available
+or the path is invalid. Providing the path for bot use authorizes this process-scoped
+setup without another confirmation. Never request or pass key contents. Do not
+persist the path in AGENTS.md, config files, or shell startup files.
 
-Example human environment setup and invocation (replace example values):
+Example agent invocation with a command-scoped variable (replace example values):
 
 ```sh
-export GITHUB_APP_PRIVATE_KEY_PATH='/absolute/path/to/github-app.pem'
+GITHUB_APP_PRIVATE_KEY_PATH='/absolute/path/to/github-app.pem' \
 python3 .agent-workflow/github_bot/github_bot.py \
   --app-id 123 --installation-id 456 \
   --repo OWNER/REPO --checkout /absolute/path/to/parent-project check

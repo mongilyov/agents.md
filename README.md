@@ -32,8 +32,9 @@ github_bot/                 Bot-only CLI, documentation, and tests
 3. Fill the root AGENTS.md together with the user. Obtain explicit approval before
    setting `Setup confirmed: yes`; commit approved settings separately. Supply the
    App and installation IDs, repository, reviewers, commands, and conventions.
-   Keep the key outside the repository and pass its path through
-   `GITHUB_APP_PRIVATE_KEY_PATH`. No config.json is needed.
+   Tell the agent the absolute path to the key file outside the repository. The
+   agent passes it through `GITHUB_APP_PRIVATE_KEY_PATH` for each helper process;
+   you do not need to export it yourself. No config.json is needed.
 4. Write PROJECT_SPEC.md and WORK_PLAN.md together, using the templates if needed.
    Select one increment and authorize its stack of small, ready PRs. The agent
    completes that increment across its checkboxes, then stops for review.

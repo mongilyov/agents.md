@@ -125,12 +125,18 @@ from the working tree and verify origin matches the configured repository.
 App and installation IDs cannot be inferred from the private key or origin alone;
 ask for them during setup if unknown. Do not guess IDs or silently choose an installation.
 
-Before a helper call, verify GITHUB_APP_PRIVATE_KEY_PATH is set to an existing key
-file. If missing, ask the user in chat for the local file path, never for the private
-key contents or an upload. With authorization, set the path in the helper process's
-environment for this task. Do not write the path or key into AGENTS.md, a config file,
-or shell startup files, and do not search the machine for keys. An already configured
-valid environment variable does not require asking again.
+The agent manages `GITHUB_APP_PRIVATE_KEY_PATH` for helper invocations; do not ask
+the user to export it or configure their shell. Reuse a valid existing value or
+the local key-file path already supplied by the user in this conversation.
+If neither is available, ask once in chat for the absolute local file path, never
+for the key contents or an upload. Providing the path for bot use authorizes
+passing it to helper processes for authorized tasks; no separate confirmation is
+needed. Verify the file exists, then set the variable in each helper subprocess's
+environment (or with a command-scoped environment assignment). This passes the
+path, not the private key contents. Do not persist the path or key in AGENTS.md,
+config files, or shell startup files, and do not search the machine for keys.
+Ask again only if the path is unavailable or invalid; bot actions still require
+authorization under the task's normal publishing rules.
 
 If the helper is unavailable or settings are incomplete, report the publishing blocker;
 do not fall back to personal GitHub credentials.
