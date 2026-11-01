@@ -29,7 +29,9 @@ values; use `not applicable` where appropriate. Never store credentials here.
 - Workflow submodule: `.agent-workflow`
 - GitHub bot helper: `.agent-workflow/github_bot/github_bot.py`
 - GitHub bot README: `.agent-workflow/github_bot/README.md`
-- GitHub bot config: `<absolute path to external config.json; never commit it or the private key>`
+- GitHub App ID: `<numeric app ID>`
+- GitHub installation ID: `<numeric installation ID>`
+- Private-key path environment variable: `GITHUB_APP_PRIVATE_KEY_PATH`
 - Workflow source revision: `<approved commit SHA from mongilyov/agents.md>`
 - Pinned workflow template: `.agent-workflow/templates/AGENTS.md`
 - Workflow validator: `.agent-workflow/scripts/check_agents.py`
@@ -43,7 +45,7 @@ invalid settings require returning to the setup gate.
 ## Protect and update these instructions
 
 - During setup, change only the content between the project settings markers. Preserve all shared text and the markers exactly. During ordinary feature work, do not change AGENTS.md, its pinned template, validator, or workflow source revision.
-- Adopt this repository as a submodule at `.agent-workflow`, pinned to an explicitly approved commit. Copy its template to the parent project's root AGENTS.md; use the bundled helper and validator at the configured paths. Keep credentials and real helper configuration outside both repositories. Never fetch and apply the latest workflow automatically at task startup.
+- Adopt this repository as a submodule at `.agent-workflow`, pinned to an explicitly approved commit. Copy its template to the parent project's root AGENTS.md; use the bundled helper and validator at the configured paths. Keep the private key outside both repositories; supply its path only through the configured environment variable. Nonsecret App and installation IDs belong in project settings. Never fetch and apply the latest workflow automatically at task startup.
 - Run the configured validator against the configured pinned template and AGENTS.md after setup and before publishing changes. `--allow-unconfigured` is for setup-only shared-text checks, not a bypass for ordinary work. Report failures; do not alter the baseline or checker to make them pass.
 - Update shared rules or the bundled helper only when the user explicitly requests a workflow update. Review the upstream diff, select the approved commit, update the submodule pointer and recorded revision, and refresh root AGENTS.md while preserving settings. Verify the new helper and validator before using them with credentials. Commit these changes together in a dedicated parent-project PR. Ordinary feature authorization does not authorize a workflow upgrade.
 - Treat the submodule as read-only during project work. Do not fill settings or create feature branches inside it. Shared changes require a separate upstream PR; after merge, adopt the reviewed commit in the parent project. The parent's commit stores the submodule commit ID, not uncommitted edits inside it.
@@ -136,15 +138,28 @@ imports of helper internals, or personal credentials. Local Git status/diff/add/
 operations may use Git directly. Read its configured README.md before first use.
 
 Resolve configured relative paths from the parent project root. Invoke with python3
-and explicitly pass the external config, repository, and actual parent checkout
+and explicitly pass the App ID, installation ID, repository, and actual parent checkout
 path (including worktrees) before the subcommand. For an authorized source fetch,
 select the workflow repository and submodule checkout instead:
 
 ```text
-python3 <helper-path> --config <EXTERNAL_CONFIG_PATH> --repo <OWNER/REPO> --checkout <PARENT_CHECKOUT_PATH> <subcommand>
+python3 <helper-path> --app-id <APP_ID> --installation-id <INSTALLATION_ID> --repo <OWNER/REPO> --checkout <PARENT_CHECKOUT_PATH> <subcommand>
 ```
 
-If the helper is unavailable or unconfigured, report the publishing blocker;
+There is no config.json and the helper does not parse AGENTS.md itself. The agent
+passes the approved nonsecret settings as arguments. Derive the actual checkout
+from the working tree and verify origin matches the configured repository.
+App and installation IDs cannot be inferred from the private key or origin alone;
+ask for them during setup if unknown. Do not guess IDs or silently choose an installation.
+
+Before a helper call, verify GITHUB_APP_PRIVATE_KEY_PATH is set to an existing key
+file. If missing, ask the user in chat for the local file path, never for the private
+key contents or an upload. With authorization, set the path in the helper process's
+environment for this task. Do not write the path or key into AGENTS.md, a config file,
+or shell startup files, and do not search the machine for keys. An already configured
+valid environment variable does not require asking again.
+
+If the helper is unavailable or settings are incomplete, report the publishing blocker;
 do not fall back to personal GitHub credentials.
 
 Commands:

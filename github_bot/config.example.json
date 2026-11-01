@@ -1,7 +1,0 @@
-{
-  "app_id": 0,
-  "installation_id": 0,
-  "private_key": "/absolute/path/outside/repositories/github-app.pem",
-  "repository": "OWNER/REPO",
-  "checkout": "/absolute/path/to/project"
-}

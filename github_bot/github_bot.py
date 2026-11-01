@@ -383,10 +383,10 @@ def edit_pr(session, number, title=None, body=None):
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--config', default=str(Path(__file__).with_name('config.json')))
-    p.add_argument('--repo', help='Override repository: OWNER/REPO')
-    p.add_argument('--checkout', help='Override local checkout')
-    p.add_argument('--installation-id', type=int, help='Override for a different installation')
+    p.add_argument('--app-id', type=int, help='GitHub App ID from project settings')
+    p.add_argument('--installation-id', type=int, help='Installation ID from project settings')
+    p.add_argument('--repo', help='Explicit repository from project settings: OWNER/REPO')
+    p.add_argument('--checkout', help='Absolute path to the actual working checkout')
     commands = p.add_subparsers(dest='command', required=True)
     commands.add_parser('check', help='Verify bot, token scope, permissions, and HTTPS Git read access')
     commands.add_parser('fetch', help='Fetch origin with isolated bot credentials; never merge')
@@ -425,15 +425,34 @@ def parser():
     return p
 
 
+def runtime_settings(args):
+    # Nonsecret values come explicitly from AGENTS.md via CLI arguments.
+    for name in ('app_id', 'installation_id'):
+        value = getattr(args, name)
+        if value is None or value <= 0:
+            raise BotError('Supply a positive --' + name.replace('_', '-') + ' from AGENTS.md.')
+    if not args.repo or not args.checkout:
+        raise BotError('Supply --repo from AGENTS.md and --checkout for the actual working checkout.')
+    checkout = Path(args.checkout).expanduser()
+    if not checkout.is_absolute():
+        raise BotError('--checkout must be an absolute path.')
+    key_path = os.environ.get('GITHUB_APP_PRIVATE_KEY_PATH')
+    if not key_path:
+        raise BotError('Set GITHUB_APP_PRIVATE_KEY_PATH to the private-key file path; ask the user for the path, never the key contents.')
+    key = Path(key_path).expanduser()
+    if not key.is_absolute() or not key.is_file():
+        raise BotError('GITHUB_APP_PRIVATE_KEY_PATH must identify an existing absolute file path.')
+    return {'app_id': args.app_id, 'installation_id': args.installation_id,
+            'repository': normalize_repo(args.repo), 'checkout': str(checkout),
+            'private_key': str(key)}
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == '_credential':
         credential()
         return
     args = parser().parse_args()
-    config = json.loads(Path(args.config).read_text())
-    for argument, key in [('repo', 'repository'), ('checkout', 'checkout'), ('installation_id', 'installation_id')]:
-        if getattr(args, argument) is not None:
-            config[key] = getattr(args, argument)
+    config = runtime_settings(args)
     checkout = Path(config['checkout']).expanduser()
     with Session(config) as session:
         url = 'https://github.com/' + session.repo + '.git'

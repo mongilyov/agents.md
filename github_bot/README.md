@@ -4,25 +4,41 @@ Repository-scoped GitHub App operations using Python 3.9+, OpenSSL, and Git.
 This is the maintained copy of the local helper, bundled with the workflow so
 projects can pin code, instructions, and validation together in one submodule.
 
-## Configuration
+## Settings without a config file
 
-Copy config.example.json to a private location outside repositories, fill the App
-and installation IDs and the absolute private-key path, and restrict local access.
-The private key must also remain outside repositories. Never commit a real config,
-key, or token. The example contains no credentials. Grant the installation access
-to each project and to the workflow repository if fetching it as the bot.
+The bundled helper no longer reads config.json or accepts --config. Store the
+nonsecret App ID, installation ID, repository, and reviewer settings in the parent
+project's AGENTS.md. The agent reads those settings and passes CLI arguments; the
+helper intentionally does not parse arbitrary Markdown. Confirm the repository
+against origin and resolve the actual checkout path, including worktrees.
 
-Always invoke from the parent project using explicit global arguments:
+The private key remains a local file outside repositories. Only its path is passed
+through `GITHUB_APP_PRIVATE_KEY_PATH`. If it is missing, the agent asks for the local
+path, never the key contents. It may set a process environment variable with user
+authorization; it must not persist the path in AGENTS.md, config files, or shell
+startup files. If the variable is already valid, no repeated question is needed.
 
-```text
+Example human environment setup and invocation (replace example values):
+
+```sh
+export GITHUB_APP_PRIVATE_KEY_PATH='/absolute/path/to/github-app.pem'
 python3 .agent-workflow/github_bot/github_bot.py \
-  --config /absolute/external/path/config.json \
-  --repo OWNER/REPO --checkout /absolute/path/to/parent-project <command>
+  --app-id 123 --installation-id 456 \
+  --repo OWNER/REPO --checkout /absolute/path/to/parent-project check
 ```
 
-The checkout is the parent project, not the workflow submodule. For an explicitly
-authorized workflow-source fetch, select `--repo mongilyov/agents.md` and the
-submodule's absolute path as `--checkout`. Do not rely on config repository defaults.
+The IDs are identifiers, not secrets. They cannot be derived from the private key
+or repository URL alone; obtain and approve them during setup. The app installation
+must have access to each project. For an authorized workflow-source fetch, use its
+repository and absolute submodule checkout with the appropriate installation ID.
+
+No credentials or machine-specific key path are committed here. Missing settings
+fail before authentication with a clear error; the helper never falls back to a
+config file, personal credentials, or another installation.
+
+This change applies only to this bundled helper. Existing external installations
+such as ~/tools/github_bot are not modified and may still use --config. Adopt the
+new helper and matching instructions together through an explicit workflow upgrade.
 
 ## Commands
 
@@ -83,7 +99,7 @@ python3 -m unittest discover -s github_bot -v
 ```
 
 Tests use fake API sessions and a disposable local Git repository. They do not use
-real credentials or GitHub writes. The copied helper has 37 tests covering identity,
+real credentials or GitHub writes. The copied helper has 43 tests covering identity,
 credential isolation, ready/stack validation, requests/re-requests, CLI parsing,
 permission reporting, CI reads, and PR editing.
 
@@ -119,5 +135,9 @@ helper path the agent actually executed; older local or pinned copies can retain
 the unauthenticated lookup. This repository's helper and the maintained external
 local copy now use authenticated lookup. Other submodule pins need explicit updates.
 
-37 offline tests pass, including lookup order/token use, token cleanup on failure,
+43 offline tests pass, including lookup order/token use, token cleanup on failure,
 safe rate-limit diagnostics, malformed-header rejection, and existing stack tests.
+
+Six additional tests cover config-free argument/environment setup, missing/invalid
+IDs and key paths, rejection of --config, no config-file reads, and credential
+helper compatibility.

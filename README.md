@@ -13,7 +13,6 @@ templates/WORK_PLAN.md       Agreed increments and verification
 scripts/check_agents.py     Guard against unintended instruction changes
 github_bot/github_bot.py     Bot-only GitHub CLI
 github_bot/README.md         Helper setup, commands, and limitations
-github_bot/config.example.json  Placeholder configuration only
 ```
 
 ## Adopt as a submodule
@@ -30,7 +29,7 @@ pinned submodule commit. Do not edit settings inside the submodule.
    `Setup confirmed` remains `no`.
 2. **Settings commit.** The agent asks you to fill and approve the marked settings.
    Set the parent repository, reviewers, commands, agent prefix, source revision,
-   and external bot config path. The integration branch is `master`. Paths to the
+   and the nonsecret GitHub App and installation IDs. The integration branch is `master`. Paths to the
    helper, README, template, and validator already point into `.agent-workflow`.
    After your explicit confirmation, record `Setup confirmed: yes`, validate, and
    commit only the settings changes.
@@ -63,17 +62,26 @@ available. Agents must report unsupported bootstrap operations rather than bypas
 bot-only GitHub access. After initialization, use the helper for bot commits,
 pushes, fetches, and all GitHub API operations.
 
-Configure credentials outside both repositories, following `github_bot/README.md`.
-The checked-in example contains no real IDs, private key, or token. Invoke:
+Keep the private key outside both repositories. The bundled helper uses no config
+file: the agent passes public settings from AGENTS.md as CLI arguments and the
+key's local path through `GITHUB_APP_PRIVATE_KEY_PATH`. If that environment variable
+is missing, it asks you for the path in chat, not the key contents.
 
 ```text
 python3 .agent-workflow/github_bot/github_bot.py \
-  --config /absolute/external/path/config.json \
+  --app-id APP_ID --installation-id INSTALLATION_ID \
   --repo OWNER/REPO --checkout /absolute/path/to/parent-project <command>
 ```
 
-The config is external and must be supplied explicitly. The checkout argument is
-the parent project (or its worktree), not the helper's submodule directory.
+Set the environment variable in your shell or authorize the agent to set it for
+its helper process. No config.json, key path, or private key belongs in the project.
+The checkout argument is the parent project (or its worktree), not the helper's
+submodule directory. The App and installation IDs must be supplied during setup;
+they cannot be derived from the key or origin alone. See github_bot/README.md.
+
+Existing ~/tools/github_bot installations remain unchanged and retain their old
+config interface. Only the bundled helper removes --config. Update the instructions
+and submodule pin together when adopting this interface.
 
 ## Synchronizing versus upgrading
 
