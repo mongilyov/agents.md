@@ -16,6 +16,31 @@ class RuntimeSettingsTests(unittest.TestCase):
             with patch.dict(os.environ,{'GITHUB_APP_PRIVATE_KEY_PATH':str(key)}),patch.object(Path,'read_text',side_effect=AssertionError('config file read')):
                 result=bot.runtime_settings(self.args())
             self.assertEqual(result,{'app_id':123,'installation_id':456,'repository':'owner/repo','checkout':'/project','private_key':str(key)})
+    def test_local_key_path_reused_without_environment(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); key=root/'app.pem'; key.write_text('placeholder')
+            (root/'.github-bot-key-path').write_text(str(key)+'\n')
+            args=self.args(); args.checkout=d
+            with patch.dict(os.environ,{},clear=True):
+                self.assertEqual(bot.runtime_settings(args)['private_key'],str(key))
+
+    def test_environment_overrides_local_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); key=root/'override.pem'; key.write_text('placeholder')
+            (root/'.github-bot-key-path').write_text('/stale-local-path')
+            args=self.args(); args.checkout=d
+            with patch.dict(os.environ,{'GITHUB_APP_PRIVATE_KEY_PATH':str(key)}):
+                self.assertEqual(bot.runtime_settings(args)['private_key'],str(key))
+
+    def test_invalid_local_file_fails_without_echoing_contents(self):
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d); args=self.args(); args.checkout=d
+            for value in ['', 'relative.pem', '/missing-private-path', '/one\n/two', '-----BEGIN PRIVATE KEY-----\nsecret']:
+                (root/'.github-bot-key-path').write_text(value)
+                with patch.dict(os.environ,{},clear=True), self.assertRaises(bot.BotError) as e:
+                    bot.runtime_settings(args)
+                if value: self.assertNotIn(value,str(e.exception))
+
     def test_missing_key_environment(self):
         with patch.dict(os.environ,{},clear=True):
             with self.assertRaisesRegex(bot.BotError,'GITHUB_APP_PRIVATE_KEY_PATH'):

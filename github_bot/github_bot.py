@@ -460,10 +460,17 @@ def runtime_settings(args):
         raise BotError('--checkout must be an absolute path.')
     key_path = os.environ.get('GITHUB_APP_PRIVATE_KEY_PATH')
     if not key_path:
-        raise BotError('Set GITHUB_APP_PRIVATE_KEY_PATH to the private-key file path; ask the user for the path, never the key contents.')
+        try:
+            key_path = (checkout / '.github-bot-key-path').read_text().strip()
+        except FileNotFoundError:
+            raise BotError('Supply GITHUB_APP_PRIVATE_KEY_PATH or save the user-provided path in the ignored .github-bot-key-path file.') from None
+        except (OSError, UnicodeError):
+            raise BotError('Cannot read .github-bot-key-path; ask the user to correct the local path file.') from None
+    if not key_path or '\n' in key_path or '\r' in key_path or '\x00' in key_path:
+        raise BotError('The key path must be one absolute file path, not private-key contents.')
     key = Path(key_path).expanduser()
     if not key.is_absolute() or not key.is_file():
-        raise BotError('GITHUB_APP_PRIVATE_KEY_PATH must identify an existing absolute file path.')
+        raise BotError('The configured key path must identify an existing absolute file path.')
     return {'app_id': args.app_id, 'installation_id': args.installation_id,
             'repository': normalize_repo(args.repo), 'checkout': str(checkout),
             'private_key': str(key)}
