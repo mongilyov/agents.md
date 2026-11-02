@@ -125,18 +125,23 @@ from the working tree and verify origin matches the configured repository.
 App and installation IDs cannot be inferred from the private key or origin alone;
 ask for them during setup if unknown. Do not guess IDs or silently choose an installation.
 
-The agent manages `GITHUB_APP_PRIVATE_KEY_PATH` for helper invocations; do not ask
-the user to export it or configure their shell. Reuse a valid existing value or
-the local key-file path already supplied by the user in this conversation.
-If neither is available, ask once in chat for the absolute local file path, never
-for the key contents or an upload. Providing the path for bot use authorizes
-passing it to helper processes for authorized tasks; no separate confirmation is
-needed. Verify the file exists, then set the variable in each helper subprocess's
-environment (or with a command-scoped environment assignment). This passes the
-path, not the private key contents. Do not persist the path or key in AGENTS.md,
-config files, or shell startup files, and do not search the machine for keys.
-Ask again only if the path is unavailable or invalid; bot actions still require
-authorization under the task's normal publishing rules.
+The helper uses `GITHUB_APP_PRIVATE_KEY_PATH` when supplied; otherwise it reads
+`.github-bot-key-path` from the selected `--checkout` root. That local file contains
+only the absolute key-file path on one line, never key contents. The agent manages
+this setup; the user does not need to export variables or edit local files.
+
+Reuse the saved path, a valid environment override, or a path already provided in
+chat. If none is available or valid, ask the user for the absolute local key-file
+path, not the key contents. Once supplied for bot use, verify it exists, add
+`/.github-bot-key-path` to the parent project's .gitignore, verify the path file is
+ignored and untracked, and write the path there. This task authorizes saving the
+path locally without another confirmation. Commit the ignore rule, never the path
+file. Do not put the path in AGENTS.md or shell startup files, copy the key into the
+project, or search the machine for keys. Ask again only when the saved path is
+missing or invalid. New clones/worktrees may need their own local path file.
+For operations selecting another checkout (such as a workflow-source fetch), pass
+the known path through the helper process environment instead of requiring a second
+saved file. Publishing still requires authorization under the user's task.
 
 If the helper is unavailable or settings are incomplete, report the publishing blocker;
 do not fall back to personal GitHub credentials.

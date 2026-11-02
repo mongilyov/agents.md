@@ -33,8 +33,9 @@ github_bot/                 Bot-only CLI, documentation, and tests
    setting `Setup confirmed: yes`; commit approved settings separately. Supply the
    App and installation IDs, repository, reviewers, commands, and conventions.
    Tell the agent the absolute path to the key file outside the repository. The
-   agent passes it through `GITHUB_APP_PRIVATE_KEY_PATH` for each helper process;
-   you do not need to export it yourself. No config.json is needed.
+   agent adds `/.github-bot-key-path` to the project .gitignore and saves only the
+   path in that ignored, untracked file. Future chats reuse it. An optional
+   `GITHUB_APP_PRIVATE_KEY_PATH` overrides the file; no manual export is required.
 4. Write PROJECT_SPEC.md and WORK_PLAN.md together, using the templates if needed.
    Select one increment and authorize its stack of small, ready PRs. The agent
    completes that increment across its checkboxes, then stops for review.
@@ -103,7 +104,8 @@ until their own upgrade PR is accepted.
 ## Bot and reviews
 
 Read [the helper guide](github_bot/README.md) before first use. Agents pass approved
-root settings explicitly and supply only the key path through the environment:
+root settings explicitly. The helper reads the ignored `.github-bot-key-path` from
+the project checkout, or uses `GITHUB_APP_PRIVATE_KEY_PATH` as an override:
 
 ```text
 python3 .agent-workflow/github_bot/github_bot.py \
