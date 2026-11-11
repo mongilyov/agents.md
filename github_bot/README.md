@@ -12,13 +12,19 @@ project's AGENTS.md. The agent reads those settings and passes CLI arguments; th
 helper intentionally does not parse arbitrary Markdown. Confirm the repository
 against origin and resolve the actual checkout path, including worktrees.
 
-The private key remains a local file outside repositories. The user supplies its
-absolute path in chat; the agent sets `GITHUB_APP_PRIVATE_KEY_PATH` on each helper
-process. The user does not need to export anything. Reuse a valid existing variable
-or a path already supplied in the conversation; ask only when neither is available
-or the path is invalid. Providing the path for bot use authorizes this process-scoped
-setup without another confirmation. Never request or pass key contents. Do not
-persist the path in AGENTS.md, config files, or shell startup files.
+The private key remains a local file outside repositories. The user gives its
+absolute path in chat. The agent adds `/.github-bot-key-path` to the parent
+project's .gitignore, verifies the file is ignored and untracked, and writes only
+the path plus a newline into it. Commit the ignore rule, never the path file.
+The helper reads this file from `--checkout`, so later chats reuse the path without
+asking again. The file is plain text, not shell code; it is never executed.
+
+`GITHUB_APP_PRIVATE_KEY_PATH` takes precedence when nonempty. Use this override for
+another key or when selecting a different checkout such as the workflow submodule.
+An invalid override fails instead of silently falling back. If neither source is
+valid, ask for the local path again, never key contents. The agent handles local
+setup; the user does not need to export anything. New clones/worktrees may require
+a new local path file. Do not save the path in AGENTS.md or shell startup files.
 
 Example agent invocation with a command-scoped variable (replace example values):
 
@@ -36,7 +42,7 @@ repository and absolute submodule checkout with the appropriate installation ID.
 
 No credentials or machine-specific key path are committed here. Missing settings
 fail before authentication with a clear error; the helper never falls back to a
-config file, personal credentials, or another installation.
+config.json, personal credentials, or another installation.
 
 This change applies only to this bundled helper. Existing external installations
 such as ~/tools/github_bot are not modified and may still use --config. Adopt the
@@ -108,7 +114,7 @@ python3 -m unittest discover -s github_bot -v
 ```
 
 Tests use fake API sessions and a disposable local Git repository. They do not use
-real credentials or GitHub writes. The copied helper has 47 tests covering identity,
+real credentials or GitHub writes. The copied helper has 50 tests covering identity,
 credential isolation, ready/stack validation, requests/re-requests, CLI parsing,
 permission reporting, CI reads, and PR editing.
 

@@ -4,3 +4,5 @@ __pycache__/
 config.json
 *.pem
 *.key
+
+/.github-bot-key-path

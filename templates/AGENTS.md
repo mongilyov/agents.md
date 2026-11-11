@@ -31,4 +31,4 @@ values; use `not applicable` where appropriate. Never store credentials here.
 - GitHub bot README: `.agent-workflow/github_bot/README.md`
 - GitHub App ID: `<numeric app ID>`
 - GitHub installation ID: `<numeric installation ID>`
-- Private-key path environment variable: `GITHUB_APP_PRIVATE_KEY_PATH` (agent sets it per helper process using the path supplied in chat)
+- Private-key path environment variable: `GITHUB_APP_PRIVATE_KEY_PATH` (optional override; otherwise the helper reads the ignored `.github-bot-key-path` in the project root)
